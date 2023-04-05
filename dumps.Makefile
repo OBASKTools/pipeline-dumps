@@ -20,11 +20,11 @@ endif
 ifndef SPARQL_DIR
 	$(error SPARQL_DIR environment variable not set)
 endif
+ifndef NEO4J2OWL_CONFIG
+	$(error NEO4J2OWL_CONFIG environment variable not set)
+endif
 ifndef SCRIPTS_DIR
 	$(error SCRIPTS_DIR environment variable not set)
-endif
-ifndef VFB_CONFIG
-	$(error VFB_CONFIG environment variable not set)
 endif
 ifndef STDOUT_FILTER
 $(error STDOUT_FILTER environment variable not set)
@@ -54,18 +54,19 @@ $(RAW_DUMPS_DIR)/construct_all.owl: $(RAW_DUMPS_DIR)/all.ttl
 		annotate --ontology-iri "http://virtualflybrain.org/data/VFB/OWL/raw/all.owl" \
 		convert -f owl -o $@ $(STDOUT_FILTER)
 
-$(RAW_DUMPS_DIR)/inferred_annotation.owl: $(FINAL_DUMPS_DIR)/owlery.owl $(RAW_DUMPS_DIR)/vfb-config.yaml
+$(RAW_DUMPS_DIR)/inferred_annotation.owl: $(FINAL_DUMPS_DIR)/owlery.owl $(NEO4J2OWL_CONFIG)
 	java -jar $ $(SCRIPTS_DIR)/infer-annotate.jar $^ $(INFER_ANNOTATE_RELATION) $@
 
-$(RAW_DUMPS_DIR)/unique_facets.owl: $(FINAL_DUMPS_DIR)/owlery.owl $(RAW_DUMPS_DIR)/vfb-config.yaml
+$(RAW_DUMPS_DIR)/unique_facets.owl: $(FINAL_DUMPS_DIR)/owlery.owl $(NEO4J2OWL_CONFIG)
 	java -jar $ $(SCRIPTS_DIR)/infer-annotate.jar $^ $(UNIQUE_FACETS_ANNOTATION) $@ true
 
-$(RAW_DUMPS_DIR)/vfb-config.yaml:
+#$(RAW_DUMPS_DIR)/vfb-config.yaml:
 #	echo '=== neo4j2owl-config.yaml is being copied ==='
-#	cp /opt/conf_base/config/prod/neo4j2owl-config.yaml $@
-	wget $(VFB_CONFIG) -O $@
+#	echo $(NEO4J2OWL_CONFIG)
+#	cp $(NEO4J2OWL_CONFIG) $@
+#	wget $(VFB_CONFIG) -O $@
 
-$(FINAL_DUMPS_DIR)/solr.json: $(FINAL_DUMPS_DIR)/obographs.json $(RAW_DUMPS_DIR)/vfb-config.yaml
+$(FINAL_DUMPS_DIR)/solr.json: $(FINAL_DUMPS_DIR)/obographs.json $(NEO4J2OWL_CONFIG)
 	python3 $(SCRIPTS_DIR)/obographs-solr.py $^ $@
 
 # Add a new dump update the pipeline config:
@@ -77,9 +78,12 @@ $(FINAL_DUMPS_DIR)/solr.json: $(FINAL_DUMPS_DIR)/obographs.json $(RAW_DUMPS_DIR)
 # DUMPS_OWLERY=$(DUMPS_OWLERY)
 CSV_IMPORTS="$(FINAL_DUMPS_DIR)/csv_imports"
 OWL2NEOCSV="$(SCRIPTS_DIR)/owl2neo4jcsv.jar"
+# jar requires a url with a file protocol
+NEO4J2OWL_CONFIG_FILE="file://$(readlink --canonicalize $CSV_IMPORTS)/neo4j2owl-config.yaml"
 
 $(CSV_IMPORTS):
 	mkdir -p $@
+	cp $(NEO4J2OWL_CONFIG) $(CSV_IMPORTS)
 
 $(FINAL_DUMPS_DIR)/obographs.json: $(patsubst %, $(RAW_DUMPS_DIR)/construct_%.owl, $(DUMPS_SOLR)) $(RAW_DUMPS_DIR)/inferred_annotation.owl $(RAW_DUMPS_DIR)/unique_facets.owl
 	$(ROBOT) merge $(patsubst %, -i %, $^) convert -f json -o $@ $(STDOUT_FILTER)
@@ -91,7 +95,4 @@ $(FINAL_DUMPS_DIR)/owlery.owl: $(patsubst %, $(RAW_DUMPS_DIR)/construct_%.owl, $
 	$(ROBOT) filter -i $< --axioms "logical" --preserve-structure true annotate --ontology-iri "http://virtualflybrain.org/data/VFB/OWL/owlery.owl" -o $@ $(STDOUT_FILTER)
 
 pdb_csvs: $(FINAL_DUMPS_DIR)/pdb.owl | $(CSV_IMPORTS)
-	# echo '=== pdb_csvs neo4j2owl-config.yaml is being copied ==='
-	# cp /opt/conf_base/config/prod/neo4j2owl-config.yaml /out/dumps/csv_imports/neo4j2owl-config.yaml
-	# java $(ROBOT_ARGS) -jar $(OWL2NEOCSV) $< "file://neo4j2owl-config.yaml" $(CSV_IMPORTS)
-	java $(ROBOT_ARGS) -jar $(OWL2NEOCSV) $< "$(VFB_CONFIG)" $(CSV_IMPORTS)
+	java $(ROBOT_ARGS) -jar $(OWL2NEOCSV) $< "$(NEO4J2OWL_CONFIG_FILE)" $(CSV_IMPORTS)

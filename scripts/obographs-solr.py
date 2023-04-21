@@ -25,7 +25,7 @@ def parse_config(curie_map_file):
     config_out = dict()
     config_out['curie_map'] = {k: v for k, v in sorted(x.items(), key=lambda item: item[1], reverse=True)}
     filters = dict()
-    if 'filters' in config:
+    if 'filters' in config and config['filters']:
         if 'solr' in config['filters']:
             if 'exclusion' in config['filters']['solr']:
                 filters['exclusion']=config['filters']['solr']['exclusion']
@@ -42,18 +42,17 @@ def get_string_derivatives(label):
     label_split_numerics_alpha_camel = re.sub("([a-z])([A-Z])","\g<1> \g<2>",label_split_numerics_alpha)
     label_split_numerics_alpha = re.sub('\s+', ' ', label_split_numerics_alpha)
     label_split_numerics_alpha_camel = re.sub('\s+', ' ', label_split_numerics_alpha_camel)
-    #label_split_numerics = re.sub('(?<=\d)(?!\d)|(?<!\d)(?=\d)', ' ', label)
-    #label_split_numerics = re.sub('\s+', ' ', label_split_numerics)
+
     return [label_alpha.strip(), label_split_numerics_alpha.strip(),label_split_numerics_alpha_camel.strip()]
 
 
 # We probably DO NOT NEED this part
 def filter_out_solr(e, filters):
-    if 'iri_prefix' in filters['exclusion']:
+    if filters and 'iri_prefix' in filters['exclusion']:
         for iri in filters['exclusion']['iri_prefix']:
             if iri in e['iri']:
                 return True
-    if 'neo4j_node_label' in filters['exclusion']:
+    if filters and 'neo4j_node_label' in filters['exclusion']:
         for neo4j_label in filters['exclusion']['neo4j_node_label']:
             if neo4j_label in e['facets_annotation']:
                 return True
@@ -70,8 +69,6 @@ def construct_edge_dict(nodes: dict, edges: dict) -> dict:
         subject = e.get('sub')
         predicate = e.get('pred')
         obj = e.get('obj')
-        # Considering only subClassOf, is_a, relation for parents
-        # Should I be considering part_of, 'http://purl.obolibrary.org/obo/BFO_0000050', as well?
         if predicate == 'is_a':
             if edge.get(subject):
                 edge.get(subject).update({obj: node.get(obj)})
@@ -82,8 +79,6 @@ def construct_edge_dict(nodes: dict, edges: dict) -> dict:
 
 def obographs2solr(obo, curie_map, filters):
     solr = []
-    # I assume there is only one graph in the graphs section.
-    # Constructing a dictionary from edges list for fast lookup for parents of given terms.
     edge = construct_edge_dict(obo['graphs'][0]['nodes'], obo['graphs'][0]['edges'])
     for g in obo['graphs']:
         for e in g["nodes"]:
@@ -152,17 +147,10 @@ def obographs2solr(obo, curie_map, filters):
                         se['synonym_'+syntype].append(syn['val'])
                         se['synonym_' + syntype+'_autosuggest'].append(syn['val'])
 
-                        # Removed as discussed https://github.com/VirtualFlyBrain/vfb-pipeline-dumps/issues/9
-                        #if 'xrefs' in syn:
-                        #    se["synonym"].extend(syn['xrefs'])
-                        #    se["synonym_autosuggest"].extend(syn['xrefs'])
-
                 if 'definition' in e['meta']:
                     se['definition'] = e['meta']['definition']['val']
                     se['definition'] = (se['definition'][:98] + '..') if len(se['definition']) > 100 else se['definition']
 
-            # Adding parent information
-            # Do you want to see IRI or Short form?
             se["parent"] = []
             if 'Animal_cell' in se['facets_annotation']:
                 se["parent"] = list(edge.get(id).items())
@@ -178,10 +166,6 @@ def obographs2solr(obo, curie_map, filters):
                 solr.append(se)
     return solr
 
-
-# obographs_file = "/Users/matentzn/vfb/vfb-pipeline-dumps/test/obographs.json"
-# solr_out_file = "/Users/matentzn/vfb/vfb-pipeline-dumps/test/solr.json"
-# curie_map_file = "/Users/matentzn/vfb/vfb-prod/neo4j2owl-config.yaml"
 obographs_file = sys.argv[1]
 curie_map_file = sys.argv[2]
 solr_out_file = sys.argv[3]

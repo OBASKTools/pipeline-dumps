@@ -101,5 +101,5 @@ $(FINAL_DUMPS_DIR)/owlery.owl: $(patsubst %, $(RAW_DUMPS_DIR)/construct_%.owl, $
 
 pdb_csvs: $(FINAL_DUMPS_DIR)/pdb.owl | $(CSV_IMPORTS)
 	$(call log, $@, java $(ROBOT_ARGS) -jar $(OWL2NEOCSV) $< "$(NEO4J2OWL_CONFIG_FILE)" $(CSV_IMPORTS))
-    @echo "=== Print Timer Logs ==="
+	@echo "=== Print Timer Logs ==="
 	@cat $(LOG_FILE)

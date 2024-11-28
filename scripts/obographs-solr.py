@@ -152,7 +152,7 @@ def obographs2solr(obo, curie_map, filters):
                     se['definition'] = (se['definition'][:98] + '..') if len(se['definition']) > 100 else se['definition']
 
             se["parent"] = []
-            if 'Cell' in se['facets_annotation']:
+            if 'Cell' in se['facets_annotation'] and edge.get(id):
                 se["parent"] = list(edge.get(id).items())
 
             for key in se:

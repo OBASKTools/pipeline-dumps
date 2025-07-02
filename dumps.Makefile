@@ -101,7 +101,8 @@ $(FINAL_DUMPS_DIR)/owlery.owl: $(patsubst %, $(RAW_DUMPS_DIR)/construct_%.owl, $
 
 pdb_csvs: $(FINAL_DUMPS_DIR)/pdb.owl | $(CSV_IMPORTS)
 	$(call log, $@, java $(ROBOT_ARGS) -jar $(OWL2NEOCSV) $< "$(NEO4J2OWL_CONFIG_FILE)" $(CSV_IMPORTS))
-	@echo "=== Cleaning up CSVs: remove leading commas ==="
-	@sed -i '/^,/d' $(CSV_IMPORTS)/relationship_*.csv
+	@echo "=== Cleaning up CSVs: sort relationships ==="
+	@cd $(CSV_IMPORTS) && bash $(SCRIPTS_DIR)/csv_sorter.sh
 	@echo "=== Print Timer Logs ==="
 	@cat $(LOG_FILE)
+
